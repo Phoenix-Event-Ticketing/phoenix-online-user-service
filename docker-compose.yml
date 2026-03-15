@@ -1,0 +1,34 @@
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: phoenix_user
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  user-service:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: "mysql://app:app@mysql:3306/phoenix_user"
+      JWT_SECRET: dev-secret-change-in-production
+      PORT: 3000
+      NODE_ENV: development
+      MIGRATE_ON_START: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

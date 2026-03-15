@@ -1,0 +1,56 @@
+# Dependencies (reinstalled in container)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Environment and secrets (never in image)
+.env
+.env.*
+!.env.example
+
+# Tests and coverage (not needed at runtime)
+tests/
+coverage/
+jest.config.js
+*.test.js
+*.spec.js
+
+# Docs (optional: remove if you serve OpenAPI from image)
+# docs/
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+logs/
+*.log
+.tmp/
+.temp/
+.cache/
+
+# Docker (avoid recursive context)
+Dockerfile*
+docker-compose*
+.docker/
+
+# Misc
+README.md
+.editorconfig
+.eslintrc*
+eslint.config.js
+*.md
