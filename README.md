@@ -69,7 +69,16 @@ To run MySQL and the app locally with Docker:
 docker-compose up -d
 ```
 
-See `docker-compose.yml` for services and ports.
+See `docker-compose.yml` for services and ports. The `user-service` container uses a healthcheck on `/health/ready` with a 30s start period.
+
+## Health and probes
+
+| Endpoint        | Purpose    | Response |
+|----------------|------------|----------|
+| `GET /health`  | Liveness   | 200 when process is up (no DB check) |
+| `GET /health/ready` | Readiness / startup | 200 when DB is reachable, 503 otherwise |
+
+Use `/health` for liveness and `/health/ready` for readiness and startup probes (e.g. Kubernetes, Docker healthcheck).
 
 ## API
 

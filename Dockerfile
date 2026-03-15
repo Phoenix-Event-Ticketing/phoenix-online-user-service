@@ -24,6 +24,7 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+COPY scripts ./scripts
 COPY docs ./docs
 
 EXPOSE 3000

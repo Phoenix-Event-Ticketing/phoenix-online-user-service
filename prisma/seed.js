@@ -1,6 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+const SALT_ROUNDS = 10;
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@phoenix.local';
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'ChangeMeOnFirstLogin!';
+const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME || 'Super Admin';
 
 const ROLES = [
   { name: 'USER', description: 'Regular customers' },
@@ -113,7 +119,25 @@ async function main() {
     });
   }
 
-  console.log('Seeded roles, permissions, and role_permissions.');
+  const superAdminPasswordHash = await bcrypt.hash(SUPER_ADMIN_PASSWORD, SALT_ROUNDS);
+  await prisma.user.upsert({
+    where: { email: SUPER_ADMIN_EMAIL },
+    create: {
+      email: SUPER_ADMIN_EMAIL,
+      passwordHash: superAdminPasswordHash,
+      name: SUPER_ADMIN_NAME,
+      roleId: roleIds.ADMIN,
+      status: 'ACTIVE',
+    },
+    update: {
+      passwordHash: superAdminPasswordHash,
+      name: SUPER_ADMIN_NAME,
+      roleId: roleIds.ADMIN,
+      status: 'ACTIVE',
+    },
+  });
+
+  console.log('Seeded roles, permissions, role_permissions, and super admin user.');
 }
 
 main()

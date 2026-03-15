@@ -2,13 +2,15 @@ import pino from 'pino';
 import config from '../config/index.js';
 
 const logger = pino({
-  level: config.nodeEnv === 'production' ? 'info' : 'debug',
+  level: config.logLevel,
   formatters: {
     level: (label) => ({ level: label.toUpperCase() }),
     bindings: () => ({}),
   },
   base: {
     service: config.serviceName,
+    environment: config.nodeEnv,
+    ...(config.hostname && { hostname: config.hostname }),
   },
   timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
   messageKey: 'message',
@@ -34,6 +36,7 @@ export function createRequestLogger(req) {
     trace_id: req.headers['x-trace-id'],
   });
   return {
+    trace: (msg, meta) => child.trace(serializeLog({ ...meta, message: msg })),
     debug: (msg, meta) => child.debug(serializeLog({ ...meta, message: msg })),
     info: (msg, meta) => child.info(serializeLog({ ...meta, message: msg })),
     warn: (msg, meta) => child.warn(serializeLog({ ...meta, message: msg })),

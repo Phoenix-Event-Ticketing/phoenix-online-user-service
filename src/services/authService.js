@@ -70,12 +70,14 @@ export async function login({ email, password }) {
     role: user.role?.name ?? null,
     permissions,
   };
+  const expiresInSeconds = parseInt(config.jwt.expiresIn, 10) || 3600;
   const accessToken = jwt.sign(payload, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn,
+    algorithm: 'HS256',
+    expiresIn: expiresInSeconds,
   });
   return {
     access_token: accessToken,
     token_type: 'Bearer',
-    expires_in: parseInt(config.jwt.expiresIn, 10),
+    expires_in: expiresInSeconds,
   };
 }
