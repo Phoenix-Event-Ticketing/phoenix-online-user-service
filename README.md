@@ -80,6 +80,35 @@ See `docker-compose.yml` for services and ports. The `user-service` container us
 
 Use `/health` for liveness and `/health/ready` for readiness and startup probes (e.g. Kubernetes, Docker healthcheck).
 
+## CI (GitHub Actions)
+
+The pipeline mirrors [`phoenix-online-ticket-inventory-service`](../phoenix-online-ticket-inventory-service) (same triggers, concurrency, security scans, Sonar, GCP push, GitOps bump). Differences: **Node.js** build (lint, Jest + coverage, Prisma generate/migrate) with a **MySQL** service; **OSV Scanner** replaces Go’s `govulncheck` for dependency vulnerability SARIF.
+
+**Triggers:** `push` and `pull_request` to `main` and `dev`.
+
+**Jobs:** `build-test` → `osv-scanner`, `security` (Trivy), `sonar` (parallel) → `push-image` (push only) → `gitops-update` (push only).
+
+**Secret:** `SONAR_TOKEN` — SonarQube Cloud token.
+
+**Secret:** `GCP_SA_KEY` — service account JSON for pushing images.
+
+**Repository variables:** `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_ARTIFACT_REGISTRY`, `GCP_IMAGE_NAME`.
+
+Tags pushed: full commit SHA; plus `dev-latest` on `dev` and `main-latest` on `main`.
+
+### GitOps (platform config repo)
+
+After the image push succeeds, `gitops-update` bumps **`apps/user-service/overlays/<dev|prod>`** (same pattern as inventory’s `apps/inventory-service/...`).
+
+**Secret:** `GITOPS_REPO_PAT` — PAT with **`contents: write`** on the platform config repo.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITOPS_REPO` | Yes | GitHub repo in `owner/name` form (e.g. `Phoenix-Event-Ticketing/phoenix-online-platform-config`). |
+| `GITOPS_KUSTOMIZE_IMAGE_NAME` | No | Must match `images[].name` in each overlay. If unset, defaults to the Artifact Registry image from `GCP_*` variables. |
+
+Ensure the GitOps repo defines `apps/user-service/overlays/dev` and `apps/user-service/overlays/prod` (or adjust paths in `.github/workflows/ci.yml` to match your layout).
+
 ## API
 
 Base path: `/api/v1/users`

@@ -1,0 +1,393 @@
+name: CI
+
+on:
+
+  push:
+    branches: [main, dev]
+
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mysql://app:app@127.0.0.1:3306/phoenix_user
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: phoenix_user
+          MYSQL_USER: app
+          MYSQL_PASSWORD: app
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test with coverage
+        run: npm test -- --coverage --coverageReporters=lcov --coverageReporters=text
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/lcov.info
+
+  osv-scanner:
+    name: OSV dependency vulnerability scan
+    permissions:
+      contents: read
+      security-events: write
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OSV Scanner
+        env:
+          OSV_VERSION: "2.3.3"
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_amd64"
+          chmod +x /tmp/osv-scanner
+          sudo mv /tmp/osv-scanner /usr/local/bin/osv-scanner
+          osv-scanner --version
+
+      - name: Run OSV Scanner and generate SARIF
+        id: osv_scanner
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          osv-scanner scan -r . --format sarif --output osv.sarif
+
+      - name: Upload OSV results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: osv.sarif
+          category: osv-scanner
+
+      - name: Fail if OSV Scanner found vulnerabilities
+        if: steps.osv_scanner.outcome == 'failure'
+        run: |
+          echo "OSV Scanner reported vulnerabilities or failed. Check the step log and GitHub Security tab."
+          exit 1
+
+  security:
+    name: Trivy Security Scans
+    permissions:
+      contents: read
+      security-events: write
+      actions: write
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # limit-severities-for-sarif: true is required or trivy-action unsets TRIVY_SEVERITY for SARIF
+      # and scans all severities — exit-code then fails on LOW/MEDIUM too.
+      - name: Trivy FS vulnerability scan
+        id: trivy_fs
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          format: sarif
+          output: trivy-fs.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload FS scan to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+      - name: Trivy misconfiguration scan
+        id: trivy_config
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload config scan to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Trivy secret scan
+        id: trivy_secret
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          format: sarif
+          output: trivy-secret.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload secret scan to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-secret.sarif
+          category: trivy-secret
+
+      - name: Build Docker image
+        run: docker build -t user-service:ci .
+
+      - name: Trivy image scan
+        id: trivy_image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: user-service:ci
+          format: sarif
+          output: trivy-image.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload image scan to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      # SARIF is also in workflow artifacts so you can inspect findings even when Code scanning
+      # is not visible (e.g. private repo without GHAS) or upload-sarif did not create alerts.
+      - name: Upload Trivy SARIF as workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sarif-reports
+          path: |
+            trivy-fs.sarif
+            trivy-config.sarif
+            trivy-secret.sarif
+            trivy-image.sarif
+          if-no-files-found: warn
+
+      - name: Fail if Trivy found HIGH or CRITICAL issues
+        if: |
+          steps.trivy_fs.outcome == 'failure' ||
+          steps.trivy_config.outcome == 'failure' ||
+          steps.trivy_secret.outcome == 'failure' ||
+          steps.trivy_image.outcome == 'failure'
+        run: |
+          echo "Trivy step outcomes (failure = exit non-zero: findings OR scan error):"
+          echo "  trivy_fs:     ${{ steps.trivy_fs.outcome }}"
+          echo "  trivy_config: ${{ steps.trivy_config.outcome }}"
+          echo "  trivy_secret: ${{ steps.trivy_secret.outcome }}"
+          echo "  trivy_image:  ${{ steps.trivy_image.outcome }}"
+          echo ""
+          echo "Open the matching 'Trivy ... scan' step above for the table report."
+          echo "Download artifact 'trivy-sarif-reports' to inspect raw SARIF."
+          echo "Code scanning alerts (Security tab) require upload-sarif to succeed; private repos often need GHAS."
+          exit 1
+
+  sonar:
+    name: SonarQube Cloud Analysis + Quality Gate
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=Phoenix-Event-Ticketing_phoenix-online-user-service
+            -Dsonar.organization=phoenix-event-ticketing
+            -Dsonar.sources=src
+            -Dsonar.tests=tests
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+
+  push-image:
+    name: Push Docker image to Artifact Registry
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [osv-scanner, security, sonar]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY: ${{ vars.GCP_ARTIFACT_REGISTRY }}
+      GCP_IMAGE_NAME: ${{ vars.GCP_IMAGE_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REGISTRY}/${GCP_IMAGE_NAME}"
+          docker build -t "${IMAGE}:${GITHUB_SHA}" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          if [ "${GITHUB_REF_NAME}" = "dev" ]; then
+            docker tag "${IMAGE}:${GITHUB_SHA}" "${IMAGE}:dev-latest"
+            docker push "${IMAGE}:dev-latest"
+          fi
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            docker tag "${IMAGE}:${GITHUB_SHA}" "${IMAGE}:main-latest"
+            docker push "${IMAGE}:main-latest"
+          fi
+
+  # Requires secrets.GITOPS_REPO_PAT (contents:write on GITOPS_REPO) and vars GITOPS_REPO, GCP_*.
+  # Optional GITOPS_KUSTOMIZE_IMAGE_NAME must match overlay images[].name (same as base deployment image without tag).
+  gitops-update:
+    name: Update GitOps config (user-service image)
+    runs-on: ubuntu-latest
+    needs: push-image
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    permissions:
+      contents: read
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY: ${{ vars.GCP_ARTIFACT_REGISTRY }}
+      GCP_IMAGE_NAME: ${{ vars.GCP_IMAGE_NAME }}
+      GITOPS_KUSTOMIZE_IMAGE_NAME: ${{ vars.GITOPS_KUSTOMIZE_IMAGE_NAME }}
+
+    steps:
+      - name: Install kustomize and yq
+        env:
+          KUSTOMIZE_VERSION: "5.5.0"
+          YQ_VERSION: "v4.44.3"
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+            | tar -xzC /tmp
+          sudo mv /tmp/kustomize /usr/local/bin/kustomize
+          curl -fsSL -o /tmp/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo mv /tmp/yq /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          kustomize version
+          yq --version
+
+      - name: Checkout platform config
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.GITOPS_REPO }}
+          token: ${{ secrets.GITOPS_REPO_PAT }}
+          ref: main
+          path: gitops-repo
+
+      - name: Bump user-service image in Kustomize overlay
+        run: |
+          set -euo pipefail
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REGISTRY}/${GCP_IMAGE_NAME}"
+          KUSTOMIZE_IMAGE_NAME="${GITOPS_KUSTOMIZE_IMAGE_NAME:-${IMAGE}}"
+          case "${GITHUB_REF_NAME}" in
+            dev) OVERLAY_ENV=dev ;;
+            main) OVERLAY_ENV=prod ;;
+            *) echo "Unexpected ref: ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+          OVERLAY_DIR="gitops-repo/apps/user-service/overlays/${OVERLAY_ENV}"
+          cd "${OVERLAY_DIR}"
+          export TAG="${GITHUB_SHA}"
+          export IMG_NAME="${KUSTOMIZE_IMAGE_NAME}"
+          yq e -i '(.images[] | select(.name == strenv(IMG_NAME))).newTag = strenv(TAG)' kustomization.yaml
+          sed -i '/^    newName:/d' kustomization.yaml
+          kustomize build . >/dev/null
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          cd gitops-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u apps/user-service/overlays/
+          if git diff --cached --quiet; then
+            echo "No kustomization changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(user-service): bump image tag to ${GITHUB_SHA:0:7}"
+          git push origin HEAD:main
