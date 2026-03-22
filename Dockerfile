@@ -1,5 +1,7 @@
 FROM node:24-alpine AS base
 WORKDIR /app
+RUN apk upgrade --no-cache
+RUN npm install -g npm@11
 
 FROM base AS builder
 COPY package.json package-lock.json ./
