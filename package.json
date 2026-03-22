@@ -35,7 +35,8 @@
     "lodash": ">=4.17.21",
     "@chevrotain/cst-dts-gen": ">10.5.0",
     "@chevortain/gast": ">10.5.0",
-    "chevrotain": ">10.5.0"
+    "chevrotain": ">10.5.0",
+    "minimatch": ">10.2.3"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.5.0",
