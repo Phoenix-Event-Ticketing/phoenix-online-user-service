@@ -245,7 +245,7 @@ jobs:
           exit 1
 
   sonar:
-    name: SonarQube Cloud Analysis + Quality Gate
+    name: SonarQube Cloud Analysis (+ QG on main)
     permissions:
       contents: read
       pull-requests: read
@@ -257,6 +257,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Quality gate polling only works where SonarCloud has a matching analysis/project.
+      # Waiting on other refs often yields "project not found"; gate enforcement on main push is enough for CI.
+      - name: Set quality gate wait (main push only)
+        id: sonar_qg
+        run: |
+          if [ "${GITHUB_REF}" = "refs/heads/main" ] && [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            echo "wait=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "wait=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download coverage artifact
         uses: actions/download-artifact@v4
@@ -274,7 +285,7 @@ jobs:
             -Dsonar.sources=src
             -Dsonar.tests=tests
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.wait=${{ steps.sonar_qg.outputs.wait }}
             -Dsonar.qualitygate.timeout=300
 
   push-image:
