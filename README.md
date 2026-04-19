@@ -13,7 +13,7 @@ Authentication, authorization, and user identity management for the Phoenix-Onli
 
 - Node.js 18+
 - MySQL 8+
-- (Optional) Docker for local MySQL via `docker-compose`
+- (Optional) Docker for local MySQL via `docker-compose` to run locally
 
 ## Setup
 
