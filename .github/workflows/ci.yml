@@ -245,7 +245,7 @@ jobs:
           exit 1
 
   sonar:
-    name: SonarQube Cloud Analysis + Quality Gate
+    name: SonarQube Cloud Analysis (+ QG on main)
     permissions:
       contents: read
       pull-requests: read
@@ -257,6 +257,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Quality gate polling only works where SonarCloud has a matching analysis/project.
+      # Waiting on other refs often yields "project not found"; gate enforcement on main push is enough for CI.
+      - name: Set quality gate wait (main push only)
+        id: sonar_qg
+        run: |
+          if [ "${GITHUB_REF}" = "refs/heads/main" ] && [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            echo "wait=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "wait=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download coverage artifact
         uses: actions/download-artifact@v4
@@ -303,11 +314,19 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+        run: |
+          set -euo pipefail
+          GCP_REGION="$(printf '%s' "$GCP_REGION" | tr -d '\r\n')"
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
 
       - name: Build and push image
         run: |
           set -euo pipefail
+          # Repository variables must not contain CR/LF (invalid Docker ref); strip if pasted with CRLF.
+          GCP_REGION="$(printf '%s' "$GCP_REGION" | tr -d '\r\n')"
+          GCP_PROJECT_ID="$(printf '%s' "$GCP_PROJECT_ID" | tr -d '\r\n')"
+          GCP_ARTIFACT_REGISTRY="$(printf '%s' "$GCP_ARTIFACT_REGISTRY" | tr -d '\r\n')"
+          GCP_IMAGE_NAME="$(printf '%s' "$GCP_IMAGE_NAME" | tr -d '\r\n')"
           IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REGISTRY}/${GCP_IMAGE_NAME}"
           docker build -t "${IMAGE}:${GITHUB_SHA}" .
           docker push "${IMAGE}:${GITHUB_SHA}"
@@ -363,6 +382,11 @@ jobs:
       - name: Bump user-service image in Kustomize overlay
         run: |
           set -euo pipefail
+          GCP_REGION="$(printf '%s' "$GCP_REGION" | tr -d '\r\n')"
+          GCP_PROJECT_ID="$(printf '%s' "$GCP_PROJECT_ID" | tr -d '\r\n')"
+          GCP_ARTIFACT_REGISTRY="$(printf '%s' "$GCP_ARTIFACT_REGISTRY" | tr -d '\r\n')"
+          GCP_IMAGE_NAME="$(printf '%s' "$GCP_IMAGE_NAME" | tr -d '\r\n')"
+          GITOPS_KUSTOMIZE_IMAGE_NAME="$(printf '%s' "${GITOPS_KUSTOMIZE_IMAGE_NAME:-}" | tr -d '\r\n')"
           IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REGISTRY}/${GCP_IMAGE_NAME}"
           KUSTOMIZE_IMAGE_NAME="${GITOPS_KUSTOMIZE_IMAGE_NAME:-${IMAGE}}"
           case "${GITHUB_REF_NAME}" in

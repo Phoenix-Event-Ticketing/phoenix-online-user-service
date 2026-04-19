@@ -33,6 +33,7 @@ jest-cache/
 dist/
 build/
 out/
+generated/
 *.tsbuildinfo
 
 # IDE and editors

@@ -1,10 +1,13 @@
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /app
+RUN apk upgrade --no-cache
+RUN npm install -g npm@11
 
 FROM base AS builder
 COPY package.json package-lock.json ./
 RUN npm ci
 
+COPY prisma.config.ts ./
 COPY prisma ./prisma
 RUN npx prisma generate
 
@@ -19,6 +22,7 @@ ENV MIGRATE_ON_START=false
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
@@ -26,6 +30,10 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
 COPY scripts ./scripts
 COPY docs ./docs
+
+RUN chown -R node:node /app
+
+USER node
 
 EXPOSE 3000
 
