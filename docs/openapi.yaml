@@ -1,7 +1,10 @@
 openapi: 3.0.3
 info:
   title: Phoenix-Online User Service API
-  description: Authentication, authorization, and user identity for Phoenix-Online.
+  description: |
+    Authentication, authorization, and user identity for Phoenix-Online.
+    Protected routes use `Authorization: Bearer <JWT>`. Tokens may be **user** tokens (`sub` = user id, `permissions` claim)
+    or **service** tokens (`typ: service`, `sub` = service id; allowed permissions are resolved from `SERVICE_REGISTRY` on the server).
   version: 1.0.0
 
 servers:
@@ -87,6 +90,8 @@ paths:
                   role: { type: string }
         '401':
           description: Unauthorized
+        '403':
+          description: Forbidden — insufficient permissions (e.g. not own profile and not VIEW_USERS; service without VIEW_USERS)
         '404':
           description: User not found
     put:
@@ -109,6 +114,8 @@ paths:
           description: Updated profile
         '401':
           description: Unauthorized
+        '403':
+          description: Forbidden — not own profile without MANAGE_USERS, or service token
         '404':
           description: User not found
 
@@ -137,12 +144,15 @@ paths:
           description: Invalid role
         '401':
           description: Unauthorized
+        '403':
+          description: Forbidden — missing ASSIGN_ROLE
         '404':
           description: User not found
 
   /users/batch:
     post:
       summary: Batch user lookup (for other services)
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -166,6 +176,10 @@ paths:
                   properties:
                     id: { type: string }
                     name: { type: string }
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — user needs BATCH_USER_LOOKUP, VIEW_USERS, or MANAGE_USERS; service needs BATCH_USER_LOOKUP in SERVICE_REGISTRY
 
 components:
   securitySchemes:
@@ -173,3 +187,5 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: |
+        User JWT or service JWT (`typ: service`). Service permissions are defined by the `SERVICE_REGISTRY` environment map.

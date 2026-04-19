@@ -22,6 +22,7 @@ const PERMISSIONS = [
   { name: 'VIEW_USERS', description: 'List users (admin)' },
   { name: 'MANAGE_USERS', description: 'Create/update/delete users' },
   { name: 'ASSIGN_ROLE', description: 'Assign roles' },
+  { name: 'BATCH_USER_LOOKUP', description: 'Batch user lookup for inter-service calls' },
   // Event Service
   { name: 'VIEW_EVENTS', description: 'View event catalog' },
   { name: 'CREATE_EVENT', description: 'Create events' },

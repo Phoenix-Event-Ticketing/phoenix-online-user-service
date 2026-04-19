@@ -116,7 +116,8 @@ function requestLogObject(req, res, durationMs, event, err = null) {
     http,
   };
   if (config.hostname) obj.hostname = config.hostname;
-  if (req.user?.sub) obj.user_id = req.user.sub;
+  if (req.auth?.kind === 'user' && req.auth.userId) obj.user_id = req.auth.userId;
+  else if (req.auth?.kind === 'service' && req.auth.serviceId) obj.service_id = req.auth.serviceId;
   if (err && res) {
     obj.error_code = getErrorCode(res.statusCode);
     obj.error_message = err.message;

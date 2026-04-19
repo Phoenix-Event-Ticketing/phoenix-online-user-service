@@ -1,15 +1,21 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
+import {
+  authorizeAssignRole,
+  authorizeBatch,
+  authorizeGetProfile,
+  authorizeUpdateProfile,
+} from '../middleware/authorize.js';
 import * as userController from '../controllers/userController.js';
 
 const router = express.Router();
 
 router.post('/register', userController.register);
 router.post('/login', userController.login);
-router.post('/batch', userController.batchLookup);
+router.post('/batch', authenticate, authorizeBatch, userController.batchLookup);
 
-router.get('/:id', authenticate, userController.getProfile);
-router.put('/:id', authenticate, userController.updateProfile);
-router.put('/:id/role', authenticate, userController.assignRole);
+router.get('/:id', authenticate, authorizeGetProfile, userController.getProfile);
+router.put('/:id', authenticate, authorizeUpdateProfile, userController.updateProfile);
+router.put('/:id/role', authenticate, authorizeAssignRole, userController.assignRole);
 
 export default router;

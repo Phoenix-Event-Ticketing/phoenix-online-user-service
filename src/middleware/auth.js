@@ -2,8 +2,36 @@ import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 
 /**
- * Verify JWT from Authorization: Bearer <token> and attach decoded payload to req.user.
- * Responds 401 if missing or invalid.
+ * Build unified auth context from decoded JWT.
+ * @param {import('jsonwebtoken').JwtPayload} decoded
+ */
+function buildAuth(decoded) {
+  if (decoded.typ === 'service') {
+    const serviceId = typeof decoded.sub === 'string' ? decoded.sub : '';
+    const permissions = config.serviceRegistry[serviceId] ?? [];
+    return {
+      kind: 'service',
+      serviceId,
+      permissions,
+    };
+  }
+  const permissions = Array.isArray(decoded.permissions)
+    ? decoded.permissions.filter((p) => typeof p === 'string')
+    : [];
+  const userId = typeof decoded.sub === 'string' ? decoded.sub : '';
+  return {
+    kind: 'user',
+    userId,
+    email: decoded.email,
+    role: decoded.role,
+    permissions,
+  };
+}
+
+/**
+ * Verify JWT from Authorization: Bearer <token>.
+ * Sets req.user (decoded payload) and req.auth (user vs service with resolved permissions).
+ * Service tokens: typ=service, sub=service id; permissions from config.serviceRegistry.
  */
 export function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -24,6 +52,7 @@ export function authenticate(req, res, next) {
       clockTolerance: 10,
     });
     req.user = decoded;
+    req.auth = buildAuth(decoded);
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Invalid or expired token' });

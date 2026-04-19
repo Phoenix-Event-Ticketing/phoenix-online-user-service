@@ -17,6 +17,37 @@ if (!packageVersion) {
 
 const defaultLogLevel = process.env.NODE_ENV === 'production' ? 'info' : 'debug';
 
+/**
+ * JSON map: service id (JWT sub when typ=service) -> allowed permission names.
+ * @param {string | undefined} raw
+ * @returns {Record<string, string[]>}
+ */
+export function parseServiceRegistry(raw) {
+  if (!raw || typeof raw !== 'string' || !raw.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      /** @type {Record<string, string[]>} */
+      const out = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        if (Array.isArray(v)) {
+          out[k] = v.filter((x) => typeof x === 'string');
+        } else {
+          out[k] = [];
+        }
+      }
+      return out;
+    }
+  } catch {
+    // invalid JSON — treat as empty
+  }
+  return {};
+}
+
+const serviceRegistry = parseServiceRegistry(process.env.SERVICE_REGISTRY);
+
 export default {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -28,6 +59,8 @@ export default {
     secret: (process.env.JWT_SECRET || 'change-me-in-production').trim(),
     expiresIn: process.env.JWT_EXPIRES_IN || '3600',
   },
+  /** Map of service id -> permission names (from SERVICE_REGISTRY env). */
+  serviceRegistry,
   serviceName: 'user-service',
   version: packageVersion,
   commitSha: process.env.COMMIT_SHA,
