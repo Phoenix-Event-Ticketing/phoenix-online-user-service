@@ -29,5 +29,7 @@ COPY docs ./docs
 
 EXPOSE 3000
 
+USER 1000:1000
+
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["node", "src/server.js"]
