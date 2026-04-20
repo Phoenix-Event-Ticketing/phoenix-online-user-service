@@ -184,11 +184,15 @@ async function readinessCheck(req, res) {
   const cacheTtlMs = 30000;
   const cacheAgeMs = Date.now() - readinessCache.checkedAt;
 
-  if (!readinessCache.checkedAt || cacheAgeMs > cacheTtlMs) {
+  if (!readinessCache.checkedAt) {
     if (!readinessCache.inFlight) {
       readinessCache.inFlight = refreshReadiness();
     }
-    await readinessCache.inFlight;
+    return res.status(503).json({ status: 'unavailable', ready: false, service: 'user-service' });
+  }
+
+  if (cacheAgeMs > cacheTtlMs && !readinessCache.inFlight) {
+    readinessCache.inFlight = refreshReadiness();
   }
 
   if (readinessCache.healthy) {
