@@ -14,5 +14,10 @@ export default defineConfig({
   },
   datasource: {
     url: datasourceUrl,
+    // Increase connection pool to handle concurrent probe traffic (default was 10)
+    // MariaDB adapter connection pool size; readiness probes fire every 10s and may timeout, queuing multiple requests
+    poolConfig: {
+      connectionLimit: 20,
+    },
   },
 });

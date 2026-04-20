@@ -179,7 +179,9 @@ async function refreshReadiness() {
 }
 
 async function readinessCheck(req, res) {
-  const cacheTtlMs = 15000;
+  // Extended TTL (30s) to minimize DB queries; Kubernetes probes every 10s so 3+ probes reuse cached result
+  // This prevents connection pool exhaustion from repeated probe traffic
+  const cacheTtlMs = 30000;
   const cacheAgeMs = Date.now() - readinessCache.checkedAt;
 
   if (!readinessCache.checkedAt || cacheAgeMs > cacheTtlMs) {
