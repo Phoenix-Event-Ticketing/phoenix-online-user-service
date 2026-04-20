@@ -155,7 +155,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 
-app.get('/health/ready', async (req, res) => {
+async function readinessCheck(req, res) {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.status(200).json({ status: 'ok', ready: true, service: 'user-service' });
@@ -167,7 +167,10 @@ app.get('/health/ready', async (req, res) => {
     });
     res.status(503).json({ status: 'unavailable', ready: false, service: 'user-service' });
   }
-});
+}
+
+app.get('/health/ready', readinessCheck);
+app.get('/ready', readinessCheck);
 
 app.use('/api/v1/users', userRoutes);
 

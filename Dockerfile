@@ -1,7 +1,6 @@
 FROM node:24-alpine AS base
 WORKDIR /app
-RUN apk upgrade --no-cache
-RUN npm install -g npm@11.12.1
+RUN apk upgrade --no-cache && npm install -g npm@11.12.1
 
 FROM base AS builder
 COPY package.json package-lock.json ./
@@ -18,6 +17,7 @@ RUN chmod +x ./entrypoint.sh
 FROM base AS runner
 ENV NODE_ENV=production
 ENV MIGRATE_ON_START=false
+ENV PORT=8080
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force \
@@ -37,7 +37,7 @@ RUN chown -R node:node /app
 
 USER node
 
-EXPOSE 3000
+EXPOSE 8080
 
 USER 1000:1000
 
