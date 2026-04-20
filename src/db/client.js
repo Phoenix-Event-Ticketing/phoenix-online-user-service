@@ -1,13 +1,14 @@
 import 'dotenv/config';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '@prisma/client';
+import { withConnectionLimit } from '../utils/databaseUrl.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error('DATABASE_URL must be set');
 }
 
-const adapter = new PrismaMariaDb(databaseUrl);
+const adapter = new PrismaMariaDb(withConnectionLimit(databaseUrl));
 
 // Query logging is off by default; set PRISMA_LOG_QUERIES=1 to log SQL (e.g. for debugging).
 const logLevels =

@@ -2,13 +2,14 @@ import 'dotenv/config';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { withConnectionLimit } from '../src/utils/databaseUrl.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error('DATABASE_URL must be set');
 }
 
-const prisma = new PrismaClient({ adapter: new PrismaMariaDb(databaseUrl) });
+const prisma = new PrismaClient({ adapter: new PrismaMariaDb(withConnectionLimit(databaseUrl)) });
 
 const SALT_ROUNDS = 10;
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@phoenix.local';
