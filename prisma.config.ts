@@ -4,7 +4,7 @@ import { defineConfig } from "prisma/config";
 // `prisma generate` must run without a live DB (e.g. Docker build). Runtime and migrations require a real DATABASE_URL.
 const datasourceUrl =
   process.env.DATABASE_URL ??
-  "mysql://dummy:dummy@127.0.0.1:3306/dummy";
+  "mysql://dummy:dummy@127.0.0.1:3306/dummy?connectionLimit=20";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -14,10 +14,5 @@ export default defineConfig({
   },
   datasource: {
     url: datasourceUrl,
-    // Increase connection pool to handle concurrent probe traffic (default was 10)
-    // MariaDB adapter connection pool size; readiness probes fire every 10s and may timeout, queuing multiple requests
-    poolConfig: {
-      connectionLimit: 20,
-    },
   },
 });
