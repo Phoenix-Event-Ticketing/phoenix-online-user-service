@@ -155,18 +155,45 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 
-async function readinessCheck(req, res) {
+const readinessCache = {
+  checkedAt: 0,
+  healthy: false,
+  inFlight: null,
+};
+
+async function refreshReadiness() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({ status: 'ok', ready: true, service: 'user-service' });
+    readinessCache.healthy = true;
   } catch (err) {
+    readinessCache.healthy = false;
     logger.warn({
       event: 'readiness_check_failed',
       message: 'Readiness check failed',
       metadata: { error: err.message },
     });
-    res.status(503).json({ status: 'unavailable', ready: false, service: 'user-service' });
+  } finally {
+    readinessCache.checkedAt = Date.now();
+    readinessCache.inFlight = null;
   }
+}
+
+async function readinessCheck(req, res) {
+  const cacheTtlMs = 15000;
+  const cacheAgeMs = Date.now() - readinessCache.checkedAt;
+
+  if (!readinessCache.checkedAt || cacheAgeMs > cacheTtlMs) {
+    if (!readinessCache.inFlight) {
+      readinessCache.inFlight = refreshReadiness();
+    }
+    await readinessCache.inFlight;
+  }
+
+  if (readinessCache.healthy) {
+    return res.status(200).json({ status: 'ok', ready: true, service: 'user-service' });
+  }
+
+  return res.status(503).json({ status: 'unavailable', ready: false, service: 'user-service' });
 }
 
 app.get('/health/ready', readinessCheck);
