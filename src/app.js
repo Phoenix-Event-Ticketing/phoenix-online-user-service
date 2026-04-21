@@ -34,6 +34,7 @@ function deriveOperation(req) {
   const method = (req.method || '').toUpperCase();
 
   if (path === '/health') return 'health';
+  if (path === '/users' || path === '/users/') return 'api_status';
   if (path === '/health/ready') return 'health_ready';
 
   const afterMount = path.replace(/^\/api\/v1\/users\/?/, '') || '';
@@ -63,6 +64,7 @@ function getSuccessMessage(req) {
   const op = deriveOperation(req);
   const messages = {
     health: 'Health check succeeded',
+    api_status: 'API status check succeeded',
     health_ready: 'Readiness check succeeded',
     login: 'User login succeeded',
     register: 'User registered',
@@ -155,6 +157,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 
+app.get('/users', (req, res) => {
+  res.json({ status: 'ok', service: 'user-service' });
+});
+
 const readinessCache = {
   checkedAt: 0,
   healthy: false,
@@ -205,7 +211,7 @@ async function readinessCheck(req, res) {
 app.get('/health/ready', readinessCheck);
 app.get('/ready', readinessCheck);
 
-app.use('/api/v1/users', userRoutes);
+app.use('/users', userRoutes);
 
 app.use(errorHandler);
 
