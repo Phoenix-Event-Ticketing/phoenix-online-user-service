@@ -13,6 +13,7 @@ import logger from './utils/logger.js';
 import config from './config/index.js';
 import userRoutes from './routes/users.js';
 import prisma from './db/client.js';
+import { metricsHandler, metricsMiddleware } from './observability/metrics.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const openApiPath = join(__dirname, '..', 'docs', 'openapi.yaml');
@@ -27,6 +28,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(requestId);
+app.use(metricsMiddleware);
 
 /** Derive a semantic operation name (action) from method + path for logging. */
 function deriveOperation(req) {
@@ -210,6 +212,9 @@ async function readinessCheck(req, res) {
 
 app.get('/health/ready', readinessCheck);
 app.get('/ready', readinessCheck);
+if (config.metricsEnabled) {
+  app.get('/metrics', metricsHandler);
+}
 
 app.use('/users', userRoutes);
 

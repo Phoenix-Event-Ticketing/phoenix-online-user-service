@@ -62,6 +62,11 @@ export default {
   /** Map of service id -> permission names (from SERVICE_REGISTRY env). */
   serviceRegistry,
   serviceName: 'user-service',
+  metricsEnabled:
+    String(process.env.METRICS_ENABLED || 'true').toLowerCase() === 'true',
+  jaegerEndpoint: process.env.JAEGER_ENDPOINT || '',
+  otelServiceName: process.env.OTEL_SERVICE_NAME || 'user-service',
+  otelTracesSampler: process.env.OTEL_TRACES_SAMPLER || '1.0',
   version: packageVersion,
   commitSha: process.env.COMMIT_SHA,
   buildId: process.env.BUILD_ID,

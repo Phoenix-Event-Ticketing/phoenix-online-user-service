@@ -7,7 +7,9 @@ import { randomUUID } from 'crypto';
  */
 export default function requestId(req, res, next) {
   req.id = req.headers['x-request-id'] || `req-${randomUUID().slice(0, 8)}`;
+  req.traceId = req.headers['x-trace-id'] || req.headers.traceparent || req.id;
   req.spanId = req.headers['x-span-id'] || randomUUID().slice(0, 8);
   res.setHeader('X-Request-Id', req.id);
+  res.setHeader('X-Trace-Id', req.traceId);
   next();
 }

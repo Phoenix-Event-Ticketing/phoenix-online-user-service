@@ -2,6 +2,7 @@ import prisma from './db/client.js';
 import config from './config/index.js';
 import logger from './utils/logger.js';
 import app from './app.js';
+import { initTracing, shutdownTracing } from './observability/tracing.js';
 
 const baseMeta = {
   service: config.serviceName,
@@ -10,6 +11,10 @@ const baseMeta = {
 };
 
 async function start() {
+  await initTracing({
+    serviceName: config.otelServiceName,
+    jaegerEndpoint: config.jaegerEndpoint,
+  });
   try {
     await prisma.$connect();
     logger.info({ ...baseMeta, event: 'database_connected', message: 'Database connection established' });
@@ -39,6 +44,7 @@ async function start() {
   const shutdown = async () => {
     server.close(async () => {
       await prisma.$disconnect();
+      await shutdownTracing();
       logger.info({ ...baseMeta, event: 'server_stopped', message: 'Server shut down' });
       process.exit(0);
     });
@@ -49,6 +55,7 @@ async function start() {
 }
 
 start().catch((err) => {
+  shutdownTracing().catch(() => {});
   logger.fatal({
     ...baseMeta,
     event: 'server_start_failed',
