@@ -64,7 +64,8 @@ export default {
   serviceName: 'user-service',
   metricsEnabled:
     String(process.env.METRICS_ENABLED || 'true').toLowerCase() === 'true',
-  jaegerEndpoint: process.env.JAEGER_ENDPOINT || '',
+  // Prefer OTLP endpoint; keep JAEGER_ENDPOINT fallback for phased env compatibility.
+  otelTracesEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || process.env.JAEGER_ENDPOINT || '',
   otelServiceName: process.env.OTEL_SERVICE_NAME || 'user-service',
   otelTracesSampler: process.env.OTEL_TRACES_SAMPLER || '1.0',
   version: packageVersion,

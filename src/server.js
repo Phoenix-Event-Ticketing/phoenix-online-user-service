@@ -13,7 +13,7 @@ const baseMeta = {
 async function start() {
   await initTracing({
     serviceName: config.otelServiceName,
-    jaegerEndpoint: config.jaegerEndpoint,
+    traceEndpoint: config.otelTracesEndpoint,
   });
   try {
     await prisma.$connect();

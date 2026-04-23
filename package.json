@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "@opentelemetry/auto-instrumentations-node": "^0.73.0",
-    "@opentelemetry/exporter-jaeger": "^2.7.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.215.0",
     "@opentelemetry/sdk-node": "^0.215.0",
     "@prisma/adapter-mariadb": "^7.5.0",
     "@prisma/client": "7.5.0",
