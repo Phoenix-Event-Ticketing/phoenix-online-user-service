@@ -36,7 +36,7 @@ function deriveOperation(req) {
   const method = (req.method || '').toUpperCase();
 
   if (path === '/health') return 'health';
-  if (path === '/users' || path === '/users/') return 'api_status';
+  if (path === '/status' || path === '/status/') return 'api_status';
   if (path === '/health/ready') return 'health_ready';
 
   const afterMount = path.replace(/^\/api\/v1\/users\/?/, '') || '';
@@ -159,7 +159,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 
-app.get('/users', (req, res) => {
+app.get('/status', (req, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 
