@@ -74,6 +74,7 @@ export async function login({ email, password }) {
   const accessToken = jwt.sign(payload, config.jwt.secret, {
     algorithm: 'HS256',
     expiresIn: expiresInSeconds,
+    issuer: config.jwt.issuer,
   });
   return {
     access_token: accessToken,

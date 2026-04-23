@@ -58,6 +58,7 @@ export default {
   jwt: {
     secret: (process.env.JWT_SECRET || 'change-me-in-production').trim(),
     expiresIn: process.env.JWT_EXPIRES_IN || '3600',
+    issuer: process.env.JWT_ISSUER || 'phoenix-online-auth',
   },
   /** Map of service id -> permission names (from SERVICE_REGISTRY env). */
   serviceRegistry,
