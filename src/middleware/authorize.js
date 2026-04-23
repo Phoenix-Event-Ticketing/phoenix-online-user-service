@@ -70,3 +70,18 @@ export function authorizeBatch(req, res, next) {
   }
   return res.status(403).json({ message: 'Forbidden' });
 }
+
+/** GET /users — users only; requires VIEW_USERS or MANAGE_USERS. */
+export function authorizeListUsers(req, res, next) {
+  if (!req.auth) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  if (req.auth.kind !== 'user') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  const perms = req.auth.permissions;
+  if (perms.includes('VIEW_USERS') || perms.includes('MANAGE_USERS')) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Forbidden' });
+}

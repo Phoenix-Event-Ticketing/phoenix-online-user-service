@@ -78,3 +78,29 @@ export async function batchLookup(req, res, next) {
     next(err);
   }
 }
+
+export async function listUsers(req, res, next) {
+  try {
+    const page = Number.parseInt(String(req.query.page ?? '1'), 10);
+    const pageSize = Number.parseInt(String(req.query.pageSize ?? '10'), 10);
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const role = typeof req.query.role === 'string' ? req.query.role : undefined;
+
+    if (!Number.isNaN(page) && page < 1) {
+      return res.status(400).json({ message: 'page must be >= 1' });
+    }
+    if (!Number.isNaN(pageSize) && (pageSize < 1 || pageSize > 100)) {
+      return res.status(400).json({ message: 'pageSize must be between 1 and 100' });
+    }
+
+    const result = await userService.listUsers({
+      page: Number.isNaN(page) ? 1 : page,
+      pageSize: Number.isNaN(pageSize) ? 10 : pageSize,
+      q,
+      role,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}

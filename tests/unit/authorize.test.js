@@ -3,6 +3,7 @@ import {
   authorizeAssignRole,
   authorizeBatch,
   authorizeGetProfile,
+  authorizeListUsers,
   authorizeUpdateProfile,
 } from '../../src/middleware/authorize.js';
 
@@ -139,5 +140,47 @@ describe('authorizeBatch', () => {
     const next = jest.fn();
     authorizeBatch(req, res, next);
     expect(next).toHaveBeenCalled();
+  });
+});
+
+describe('authorizeListUsers', () => {
+  it('allows user with VIEW_USERS', () => {
+    const req = {
+      auth: { kind: 'user', userId: 'u1', permissions: ['VIEW_USERS'] },
+    };
+    const res = mockRes();
+    const next = jest.fn();
+    authorizeListUsers(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('allows user with MANAGE_USERS', () => {
+    const req = {
+      auth: { kind: 'user', userId: 'u1', permissions: ['MANAGE_USERS'] },
+    };
+    const res = mockRes();
+    const next = jest.fn();
+    authorizeListUsers(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('forbids user without list permissions', () => {
+    const req = {
+      auth: { kind: 'user', userId: 'u1', permissions: ['VIEW_PROFILE'] },
+    };
+    const res = mockRes();
+    const next = jest.fn();
+    authorizeListUsers(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('forbids service token', () => {
+    const req = {
+      auth: { kind: 'service', serviceId: 'svc', permissions: ['VIEW_USERS'] },
+    };
+    const res = mockRes();
+    const next = jest.fn();
+    authorizeListUsers(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });

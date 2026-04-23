@@ -1,5 +1,7 @@
 import prisma from '../db/client.js';
 
+const ALLOWED_ROLES = new Set(['USER', 'ORGANIZER', 'ADMIN']);
+
 export async function getProfile(userId) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -74,4 +76,58 @@ export async function batchLookup(userIds) {
     select: { id: true, name: true },
   });
   return users;
+}
+
+export async function listUsers({ page = 1, pageSize = 10, q, role } = {}) {
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const safePageSize = Number.isFinite(pageSize) && pageSize > 0
+    ? Math.min(Math.floor(pageSize), 100)
+    : 10;
+  const search = typeof q === 'string' ? q.trim() : '';
+  const normalizedRole = typeof role === 'string' ? role.trim().toUpperCase() : '';
+
+  const where = {};
+  if (search) {
+    where.OR = [
+      { email: { contains: search } },
+      { name: { contains: search } },
+    ];
+  }
+  if (normalizedRole && ALLOWED_ROLES.has(normalizedRole)) {
+    where.role = { name: normalizedRole };
+  }
+
+  const [total, users] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      skip: (safePage - 1) * safePageSize,
+      take: safePageSize,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        status: true,
+        role: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  return {
+    items: users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      status: user.status,
+      role: user.role?.name ?? null,
+    })),
+    meta: {
+      page: safePage,
+      pageSize: safePageSize,
+      total,
+      totalPages,
+    },
+  };
 }
