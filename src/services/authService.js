@@ -76,9 +76,18 @@ export async function login({ email, password }) {
     expiresIn: expiresInSeconds,
     issuer: config.jwt.issuer,
   });
+  const roleName = user.role?.name ?? 'USER';
   return {
     access_token: accessToken,
     token_type: 'Bearer',
     expires_in: expiresInSeconds,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name ?? undefined,
+      role: roleName,
+      roles: [roleName],
+      status: user.status,
+    },
   };
 }
